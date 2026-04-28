@@ -1,4 +1,5 @@
 # app.py
+# This is the comment added
 def add(a, b):
     return a + b
 
