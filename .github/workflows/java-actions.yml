@@ -40,11 +40,11 @@ jobs:
         uses: SonarSource/sonarqube-scan-action@master
         env:
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-          SONAR_LOGIN: ${{ secrets.SONAR_LOGIN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
           args: >
             -Dsonar.projectKey=spring-boot-app
-            -Dsonar.projectName=Spring Boot App
+            "-Dsonar.projectName=Spring Boot App"
             -Dsonar.sources=./spring-boot-app/src/main
 
       # Step 5: Build Docker Image
