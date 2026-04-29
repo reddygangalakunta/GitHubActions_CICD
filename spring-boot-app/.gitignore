@@ -1,9 +1,0 @@
-# Maven build output
-/target/
-
-# IntelliJ
-.idea/
-*.iml
-
-# OS files
-.DS_Store
