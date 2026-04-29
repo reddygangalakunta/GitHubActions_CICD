@@ -2,7 +2,7 @@ name: My Todo Python CI
 
 on:
   push:
-    branches: [ main, featurepy ]
+    branches: [ main, featuretodo ]
   pull_request:
     branches: [ main ]
 
