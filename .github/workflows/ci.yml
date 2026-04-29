@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: ${{ secrets.DOCKERHUB_USERNAME }}/todo-python-app
+
 jobs:
   test:
     name: Run tests
@@ -37,7 +41,7 @@ jobs:
         path: coverage.xml
 
   docker:
-    name: Build Docker Image
+    name: Build and push Docker Image
     runs-on: ubuntu-latest
     needs: test
 
@@ -45,12 +49,70 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: docker build -t taskflow:ci .
+    - name: Set up Docker buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Log in to Docker Hub
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ secrets.DOCKERHUB_USERNAME }}
+        password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix=sha-
+          type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+    - name: Build and Push Docker Image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
     - name: Smoke test container
       run: |
-        docker run -d -p 5000:5000 --name taskflow-test taskflow:ci
+        docker run -d -p 5000:5000 --name taskflow-test ${{ env.IMAGE_NAME }}:latest || \
+        docker run -d -p 5000:5000 --name taskflow-test $(docker build -q .)
         sleep 3
         curl --fail http://localhost:5000 || (docker logs taskflow-test && exit 1)
         docker stop taskflow-test
+
+    - name: Print image summary
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        echo "### Docker Image Published" >> $GITHUB_STEP_SUMMARY
+        echo "**Registry:** ${{ env.REGISTRY }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Image:** ${{ env.IMAGE_NAME }}" >> $GITHUB_STEP_SUMMARY
+        echo "**Tags:** ${{ steps.meta.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+# docker:
+#   name: Build Docker Image
+#   runs-on: ubuntu-latest
+#   needs: test
+
+#   steps:
+#   - name: Checkout code
+#     uses: actions/checkout@v4
+
+#   - name: Build Docker image
+#     run: docker build -t taskflow:ci .
+
+#   - name: Smoke test container
+#     run: |
+#       docker run -d -p 5000:5000 --name taskflow-test taskflow:ci
+#       sleep 3
+#       curl --fail http://localhost:5000 || (docker logs taskflow-test && exit 1)
+#       docker stop taskflow-test
